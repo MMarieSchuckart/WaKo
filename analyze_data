@@ -1,0 +1,298 @@
+# Script for reading in & analysing the data 
+# from the BRDF/illumination-experiment on gloss perception
+# by Pia Mandelbaum, Tobi Dahl, Rieka Mohr & Merle Schuckart (merle.schuckart@gmx.de)
+
+# Master seminar PSYM2 on gloss perception
+# Lecturer: Dr. Franz Faul
+
+# Version 1, last updated: Jan. 30 2020
+
+
+# What does this script do?
+# 1. import & load packages
+# 2. initialize functions
+# 3. read in .dat files & create dataframe
+# 4. descriptive analyses
+# 5. statistical analyses
+
+
+# ---- 1. import & load packages ----
+
+# for getting substrings (for the codes)
+#install.packages("stringr")
+library(stringr)
+
+# for mutating values
+#install.packages("dplyr")
+library(dplyr)
+
+# for pirate plots
+#install.packages("yarrr")
+library("yarrr")
+
+# ---- 2. initialize functions ----
+
+# SEM
+sem <- function(x) {
+  sd(x, na.rm = TRUE) / sqrt(length(na.omit(x)))
+}
+
+# transformation of rho values to ior (Ward --> Fresnel)
+ward2fres <- function(spec) {
+  spec/.17 + 1
+}
+
+# ---- 3. read in data ----
+
+# 3.1 set path to working directory (make sure the slashes look like this: /)
+setwd("/Users/merle/Desktop/WaKo/Experiment/Daten")
+
+# 3.2 get list of filenames in the wd
+file_list <- list.files(pattern='.dat')
+
+# create list with code for each participant 
+# (just take the file name)
+codes <- c()
+for (name in file_list){
+  codes <- c(codes, str_sub(name,1,-5))
+}
+
+
+# 3.3 loop files & get dataframe
+
+# create empty dataframe as placeholder
+df <- data.frame()
+
+for (i in 1: length(file_list)){ # loop files from file_list
+  # read in dataset
+  VP <- as.data.frame(read.table(file_list[i], stringsAsFactors = F)) 
+  
+  # append new column with participant ID:
+  ID <- c(rep(codes[i], times = length(VP$V1)))
+  VP <- as.data.frame(cbind(ID, VP))
+
+  # append file to dataframe
+  df <- as.data.frame(rbind(df, VP))
+}
+
+rm(ID, VP, codes, file_list, i, name) # clean up
+
+
+# 3.4 name columns
+
+# column 1:  ID
+# column 2:  Trial number
+# column 3:  UV: BRDF --> 0 = Fresnel, 1 = Ward
+# column 4:  UV: Strength of reflectance left blob --> value between 0 and 50
+# column 5:  Alpha (constant)
+# column 6:  UV: Illumination left blob ("Match") --> 1 = F, 2 = B or 3 = A (Focus, Brilliance, Ambience)
+# column 7:  UV: Illumination right blob ("Test") --> 1 = F, 2 = B or 3 = A (Focus, Brilliance, Ambience)
+# column 8:  Form left blob --> T or F (= rotated or not)
+# column 9:  Form right blob --> T or F (= rotated or not)
+# column 10: AV: Strength of reflectance right blob --> value between 0 and 10
+# column 11: AV: Rating --> value between 0 and 10
+
+names(df) <- c("ID", "Trial", "BRDF", "Refl_left", "Alpha", "Ill_left", "Ill_right", "Form_left", "Form_right","Refl_right", "Rating")
+
+# 3.5 mutate a few values so it's more intuitive
+
+# name BRFD conditions
+df <- mutate(df, BRDF = replace(BRDF, BRDF == 1, "Ward"))
+df <- mutate(df, BRDF = replace(BRDF, BRDF == 0, "Fresnel"))
+
+# same for illumination conditions
+df <- mutate(df, Ill_left = replace(Ill_left, Ill_left == 1, "F")) # Focus
+df <- mutate(df, Ill_left = replace(Ill_left, Ill_left == 2, "B")) # Brilliance
+df <- mutate(df, Ill_left = replace(Ill_left, Ill_left == 3, "A")) # Ambience
+
+df <- mutate(df, Ill_right = replace(Ill_right, Ill_right == 1, "F")) # Focus
+df <- mutate(df, Ill_right = replace(Ill_right, Ill_right == 2, "B")) # Brilliance
+df <- mutate(df, Ill_right = replace(Ill_right, Ill_right == 3, "A")) # Ambience
+
+
+# transform rho values to ior (Ward --> Fresnel)
+pos_Ward <- which(df$BRDF == "Ward")
+# for rho val of right blob
+df$Refl_right[pos_Ward] <- ward2fres(as.numeric(df$Refl_right[pos_Ward]))
+# for rho val of left blob
+df$Refl_left[pos_Ward] <- ward2fres(as.numeric(df$Refl_left[pos_Ward]))
+
+
+# ---- 4. descriptive analyses ----
+
+# 4.1 preprocessing
+
+# Compute difference between chosen reflectance value (column Refl_right) 
+# and shown reflectance value (column Refl_left) as absolute value.
+# The smaller the value the better was the matching. 
+# The smallest possible value is 0 (perfect match, no difference)
+Matching_Discrepancy <- as.numeric(abs(c(as.numeric(df$Refl_right) - as.numeric(df$Refl_left))))
+
+#append to df:
+df <- as.data.frame(cbind(df, Matching_Discrepancy))
+
+# clean up
+rm(Matching_Discrepancy)
+
+
+# plot raw data (matching discrepancy)
+
+# VP1 <- subset(df, ID == "VP1")  # use this to select single participants
+
+pirateplot(formula = Matching_Discrepancy ~ BRDF + Ill_right + Ill_left, 
+           data = df, # put single participant df name here
+           xlab = "BRDF",
+           ylab = "Matching Discrepancy",
+           theme = 4)
+
+
+# data cleaning
+
+# you can see that there are some outliers that are pretty far off. 
+# We should kick all trials out that have a matching discrepancy of > M + 2SDs
+
+# Get Mean & SD for every combination of BRDF, Ill. left and Ill. right & compute M + 2SD for each group
+agg_df <- aggregate(df$Matching_Discrepancy, list(BRDF = df$BRDF, Ill_left = df$Ill_left, Ill_right = df$Ill_right), FUN = mean)
+sd <- as.vector(aggregate(df$Matching_Discrepancy, list(BRDF = df$BRDF, Ill_left = df$Ill_left, Ill_right = df$Ill_right), FUN = sd)[4])
+agg_df <- as.data.frame(cbind(agg_df, sd))
+colnames(agg_df) <- c("BRDF", "Ill_left", "Ill_right", "M", "SD")
+
+Outliers <- c(agg_df$M + 2*agg_df$SD)
+agg_df <- as.data.frame(cbind(agg_df, Outliers))
+ 
+# now loop agg_df and find all rows where the value in "Matching_Discrepancy" in df 
+# is > than the value in "Outlier" in agg_df for the respective group.
+
+outlier <- c() # placeholder
+
+for (i in 1:length(agg_df$BRDF)){ # loop agg_df
+  
+  cutoff <- agg_df$Outliers[i]
+
+  out <- which(df$BRDF == agg_df$BRDF[i] & 
+               df$Ill_left == agg_df$Ill_left[i] &  
+               df$Ill_right == agg_df$Ill_right[i] &
+               df$Matching_Discrepancy > cutoff)
+  outlier <- c(outlier, out)
+}
+
+df_clean <- df[-outlier,]
+
+# Have a look at the outliers:
+df_outlier <- df[outlier,]
+
+# How many are Ward, how many Fresnel?
+length(which(df_outlier$BRDF == "Ward")) # Ward = 69 outlier trials
+length(df_outlier$BRDF) - 69 # Fresnel = 82 outlier trials
+
+# left stimulus: How many from the illumination conditions A, F and B?
+length(which(df_outlier$Ill_left == "A" & df_outlier$Ill_right == "A")) # 17
+length(which(df_outlier$Ill_left == "A" & df_outlier$Ill_right == "B")) # 18
+length(which(df_outlier$Ill_left == "A" & df_outlier$Ill_right == "F")) # 14
+
+length(which(df_outlier$Ill_left == "B" & df_outlier$Ill_right == "A")) # 18
+length(which(df_outlier$Ill_left == "B" & df_outlier$Ill_right == "B")) # 16
+length(which(df_outlier$Ill_left == "B" & df_outlier$Ill_right == "F")) # 18
+
+length(which(df_outlier$Ill_left == "F" & df_outlier$Ill_right == "A")) # 16 
+length(which(df_outlier$Ill_left == "F" & df_outlier$Ill_right == "B")) # 17
+length(which(df_outlier$Ill_left == "F" & df_outlier$Ill_right == "F")) # 17
+
+length(df_outlier$ID)
+
+# clean up
+rm(out, outlier, Outliers, sd, i, cutoff)
+
+
+# 4.2 plot matching discrepancy (this time without outliers)
+
+# matching discrepancy grouped by illumination condition & BRDF:
+pirateplot(formula = Matching_Discrepancy ~ BRDF + ID, 
+           data = df_clean, # put single participant df name here
+           xlab = "BRDF",
+           ylab = "Matching Discrepancy",
+           theme = 4)
+
+# matching discrepancy grouped by BRDF:
+pirateplot(formula = Matching_Discrepancy ~ BRDF , # , 
+           data = df, # put single participant df name here
+           xlab = "BRDF",
+           ylab = "Rating",
+           theme = 4)
+
+
+
+# 4.3 gloss perception 
+
+# gloss perception grouped by illumination condition & BRDF:
+pirateplot(formula = Rating ~ Ill_right + BRDF, 
+           data = df, # put single participant df name here
+           xlab = "BRDF",
+           ylab = "Rating",
+           theme = 4)
+
+
+
+# 4.4 consistency of reflectance estimation
+
+# Get consistency of reflectance estimation: 
+# idea: group by illumination & BRDF, then get sd of matching discrepancy
+# high values should indicate a high constancy, so we normalize the values afterwards?
+
+# aggregate dataframe:
+agg_matching = aggregate(df_clean$Matching_Discrepancy,
+                by = list(df_clean$Ill_left, df_clean$Ill_right, df_clean$BRDF),
+                FUN = sd)
+
+# normalize data, so it's between 0 and 1:
+#agg_matching$x = (agg_matching$x-min(agg_matching$x))/(max(agg_matching$x)-min(agg_matching$x))
+
+
+names(agg_matching) <- c("Ill_left", "Ill_right", "BRDF","SD")
+
+# plot gloss consistency
+pirateplot(formula = SD ~ Ill_right + Ill_left + BRDF, 
+           data = agg_matching, # put single participant df name here
+           xlab = "BRDF",
+           ylab = "Rating",
+           theme = 4)
+
+
+# ---- 5. statistical analyses ----
+# disable scientific notation
+#options(scipen=999)
+
+# Are our data normally distributed?
+# Shapiro-Wilk-Test
+shapiro.test(subset(df_clean, BRDF == "Ward")$Matching_Discrepancy)
+shapiro.test(subset(df_clean, BRDF == "Fresnel")$Matching_Discrepancy)
+
+shapiro.test(subset(df_clean, BRDF == "Ward")$Rating)
+shapiro.test(subset(df_clean, BRDF == "Fresnel")$Rating)
+
+# none of them are, so use non-parametric tests now:
+
+
+# hypothesis 1: gloss perception is > in Fresnel than in Ward
+
+# aggregate dataframe:
+agg_rating = aggregate(df_clean$Rating,
+                         by = list(df_clean$BRDF, df_clean$ID),
+                         FUN = mean)
+# wilcoxon signed rank test:
+wilcox.test(subset(agg_rating, Group.1 == "Fresnel")$x, # is > than...
+            subset(agg_rating, Group.1 == "Ward")$x, 
+            paired=T) 
+
+
+# hypothesis 2: Matching discrepancy is > in Ward than in Fresnel
+# aggregate dataframe:
+agg_matching_2 = aggregate(df_clean$Matching_Discrepancy,
+                       by = list(df_clean$BRDF, df_clean$ID),
+                       FUN = mean)
+# wilcoxon signed rank test:                       
+wilcox.test(subset(agg_matching_2, Group.1 == "Ward")$x, # is > than...
+            subset(agg_matching_2, Group.1 == "Fresnel")$x, 
+            paired=T) 
+
+
