@@ -1,4 +1,4 @@
-# WaKo
+# WaKo assignment by Rieka, Tobi, Pia & Merle
 
 This file contains all scripts needed for 
 analyzing the data from Rieka Mohr's, Tobi Dahl's, 
