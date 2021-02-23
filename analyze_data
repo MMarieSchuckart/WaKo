@@ -1,4 +1,4 @@
-# Script for reading in & analysing the data 
+# Script for reading in & analysing data 
 # from the BRDF/illumination-experiment on gloss perception
 # by Pia Mandelbaum, Tobi Dahl, Rieka Mohr & Merle Schuckart (merle.schuckart@gmx.de)
 
@@ -37,10 +37,19 @@ sem <- function(x) {
   sd(x, na.rm = TRUE) / sqrt(length(na.omit(x)))
 }
 
+# transformation of Fresnel ior values to rho (Fresnel --> Ward)
+fres2ward <- function(ior) {
+  (ior-1)*0.17
+}
+
 # transformation of rho values to ior (Ward --> Fresnel)
 ward2fres <- function(spec) {
   spec/.17 + 1
 }
+
+
+
+
 
 # ---- 3. read in data ----
 
@@ -118,9 +127,10 @@ df$Refl_right[pos_Ward] <- ward2fres(as.numeric(df$Refl_right[pos_Ward]))
 df$Refl_left[pos_Ward] <- ward2fres(as.numeric(df$Refl_left[pos_Ward]))
 
 
+
 # ---- 4. descriptive analyses ----
 
-# 4.1 preprocessing
+# ---- 4.1 matching discrepancy ----
 
 # Compute difference between chosen reflectance value (column Refl_right) 
 # and shown reflectance value (column Refl_left) as absolute value.
@@ -134,9 +144,6 @@ df <- as.data.frame(cbind(df, Matching_Discrepancy))
 # clean up
 rm(Matching_Discrepancy)
 
-
-# plot raw data (matching discrepancy)
-
 # VP1 <- subset(df, ID == "VP1")  # use this to select single participants
 
 pirateplot(formula = Matching_Discrepancy ~ BRDF + Ill_right + Ill_left, 
@@ -146,7 +153,10 @@ pirateplot(formula = Matching_Discrepancy ~ BRDF + Ill_right + Ill_left,
            theme = 4)
 
 
-# data cleaning
+(subset(df, BRDF == "Ward" & Ill_right == "F" & Ill_left == "A")$Matching_Discrepancy)
+
+
+
 
 # you can see that there are some outliers that are pretty far off. 
 # We should kick all trials out that have a matching discrepancy of > M + 2SDs
@@ -204,36 +214,73 @@ length(df_outlier$ID)
 rm(out, outlier, Outliers, sd, i, cutoff)
 
 
-# 4.2 plot matching discrepancy (this time without outliers)
+# plot again (this time without outliers)
 
 # matching discrepancy grouped by illumination condition & BRDF:
-pirateplot(formula = Matching_Discrepancy ~ BRDF + ID, 
-           data = df_clean, # put single participant df name here
-           xlab = "BRDF",
-           ylab = "Matching Discrepancy",
-           theme = 4)
+      
+pirateplot(formula = Matching_Discrepancy ~ BRDF + ID,
+                      data = df,
+                      theme = 2,  # Start with theme 2
+                      pal = c("blue", "green"),
+                      avg.line.col = "black",
+                      avg.line.o = .8,
+                      inf.disp = "line", # Use a line for inference
+                      inf.f.o = .8, # Turn up inference opacity
+                      inf.f.col = "black",
+                      point.o = .1, # Turn on points
+                      bar.f.o = .2, # Turn on bars
+                      bar.b.o = .8, # Turn on bar border
+                      bar.b.col = "black", # Turn on bar border
+                      bean.f.o = .2, # turn off bean filling
+                      bean.b.o = .6, # turn off bean border
+                      point.col = "black",
+                      point.cex = .4) # Black points
+           
 
 # matching discrepancy grouped by BRDF:
-pirateplot(formula = Matching_Discrepancy ~ BRDF , # , 
-           data = df, # put single participant df name here
-           xlab = "BRDF",
-           ylab = "Rating",
-           theme = 4)
+pirateplot(formula = Matching_Discrepancy ~ BRDF ,
+           data = df,
+           theme = 2,  # Start with theme 2
+           pal = c("blue", "green"),
+           avg.line.col = "black",
+           avg.line.o = .8,
+           inf.disp = "line", # Use a line for inference
+           inf.f.o = .8, # Turn up inference opacity
+           inf.f.col = "black",
+           point.o = .1, # Turn on points
+           bar.f.o = .2, # Turn on bars
+           bar.b.o = .8, # Turn on bar border
+           bar.b.col = "black", # Turn on bar border
+           bean.f.o = .2, # turn off bean filling
+           bean.b.o = .6, # turn off bean border
+           point.col = "black",
+           point.cex = .4) # Black points
 
 
-
-# 4.3 gloss perception 
+# ---- 3.3 gloss perception ----
 
 # gloss perception grouped by illumination condition & BRDF:
-pirateplot(formula = Rating ~ Ill_right + BRDF, 
-           data = df, # put single participant df name here
-           xlab = "BRDF",
-           ylab = "Rating",
-           theme = 4)
+pirateplot(formula = Rating ~ Ill_right + BRDF,
+           data = df,
+           theme = 2,  # Start with theme 2
+           pal = c("blue", "green", "yellow"),
+           avg.line.col = "black",
+           avg.line.o = .8,
+           inf.disp = "line", # Use a line for inference
+           inf.f.o = .8, # Turn up inference opacity
+           inf.f.col = "black",
+           point.o = .1, # Turn on points
+           bar.f.o = .2, # Turn on bars
+           bar.b.o = .8, # Turn on bar border
+           bar.b.col = "black", # Turn on bar border
+           bean.f.o = .2, # turn off bean filling
+           bean.b.o = .6, # turn off bean border
+           point.col = "black",
+           point.cex = .4) # Black points
 
 
 
-# 4.4 consistency of reflectance estimation
+# ---- 3.3 consistency of reflectance estimation ----
 
 # Get consistency of reflectance estimation: 
 # idea: group by illumination & BRDF, then get sd of matching discrepancy
@@ -255,10 +302,14 @@ pirateplot(formula = SD ~ Ill_right + Ill_left + BRDF,
            data = agg_matching, # put single participant df name here
            xlab = "BRDF",
            ylab = "Rating",
-           theme = 4)
+           theme = 2,  # Start with theme 2
+           pal = c("blue", "green", "yellow"),
+           bar.f.o = .2, # Turn on bars
+           bar.b.o = .8, # Turn on bar border
+           bar.b.col = "black") # Turn on bar border)
 
 
-# ---- 5. statistical analyses ----
+# ---- 4. statistical analyses ----
 # disable scientific notation
 #options(scipen=999)
 
@@ -279,7 +330,7 @@ shapiro.test(subset(df_clean, BRDF == "Fresnel")$Rating)
 agg_rating = aggregate(df_clean$Rating,
                          by = list(df_clean$BRDF, df_clean$ID),
                          FUN = mean)
-# wilcoxon signed rank test:
+# test it
 wilcox.test(subset(agg_rating, Group.1 == "Fresnel")$x, # is > than...
             subset(agg_rating, Group.1 == "Ward")$x, 
             paired=T) 
@@ -290,9 +341,7 @@ wilcox.test(subset(agg_rating, Group.1 == "Fresnel")$x, # is > than...
 agg_matching_2 = aggregate(df_clean$Matching_Discrepancy,
                        by = list(df_clean$BRDF, df_clean$ID),
                        FUN = mean)
-# wilcoxon signed rank test:                       
+# test it
 wilcox.test(subset(agg_matching_2, Group.1 == "Ward")$x, # is > than...
             subset(agg_matching_2, Group.1 == "Fresnel")$x, 
             paired=T) 
-
-
