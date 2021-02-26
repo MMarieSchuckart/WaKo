@@ -37,19 +37,10 @@ sem <- function(x) {
   sd(x, na.rm = TRUE) / sqrt(length(na.omit(x)))
 }
 
-# transformation of Fresnel ior values to rho (Fresnel --> Ward)
-fres2ward <- function(ior) {
-  (ior-1)*0.17
-}
-
 # transformation of rho values to ior (Ward --> Fresnel)
 ward2fres <- function(spec) {
   spec/.17 + 1
 }
-
-
-
-
 
 # ---- 3. read in data ----
 
@@ -65,7 +56,6 @@ codes <- c()
 for (name in file_list){
   codes <- c(codes, str_sub(name,1,-5))
 }
-
 
 # 3.3 loop files & get dataframe
 
@@ -83,9 +73,7 @@ for (i in 1: length(file_list)){ # loop files from file_list
   # append file to dataframe
   df <- as.data.frame(rbind(df, VP))
 }
-
 rm(ID, VP, codes, file_list, i, name) # clean up
-
 
 # 3.4 name columns
 
@@ -126,8 +114,6 @@ df$Refl_right[pos_Ward] <- ward2fres(as.numeric(df$Refl_right[pos_Ward]))
 # for rho val of left blob
 df$Refl_left[pos_Ward] <- ward2fres(as.numeric(df$Refl_left[pos_Ward]))
 
-
-
 # ---- 4. descriptive analyses ----
 
 # ---- 4.1 matching discrepancy ----
@@ -154,9 +140,6 @@ pirateplot(formula = Matching_Discrepancy ~ BRDF + Ill_right + Ill_left,
 
 
 (subset(df, BRDF == "Ward" & Ill_right == "F" & Ill_left == "A")$Matching_Discrepancy)
-
-
-
 
 # you can see that there are some outliers that are pretty far off. 
 # We should kick all trials out that have a matching discrepancy of > M + 2SDs
@@ -213,11 +196,28 @@ length(df_outlier$ID)
 # clean up
 rm(out, outlier, Outliers, sd, i, cutoff)
 
-
 # plot again (this time without outliers)
 
 # matching discrepancy grouped by illumination condition & BRDF:
-      
+pirateplot(formula = Matching_Discrepancy ~ BRDF + Ill_right + Ill_left,
+           data = df,
+           theme = 2,  # Start with theme 2
+           pal = c("blue", "green"),
+           avg.line.col = "black",
+           avg.line.o = .8,
+           inf.disp = "line", # Use a line for inference
+           inf.f.o = .8, # Turn up inference opacity
+           inf.f.col = "black",
+           point.o = .1, # Turn on points
+           bar.f.o = .2, # Turn on bars
+           bar.b.o = .8, # Turn on bar border
+           bar.b.col = "black", # Turn on bar border
+           bean.f.o = .2, # turn off bean filling
+           bean.b.o = .6, # turn off bean border
+           point.col = "black",
+           point.cex = .4) # Black points
+
+# matching discrepancy grouped by illumination ID & BRDF:
 pirateplot(formula = Matching_Discrepancy ~ BRDF + ID,
                       data = df,
                       theme = 2,  # Start with theme 2
@@ -236,7 +236,6 @@ pirateplot(formula = Matching_Discrepancy ~ BRDF + ID,
                       point.col = "black",
                       point.cex = .4) # Black points
            
-
 # matching discrepancy grouped by BRDF:
 pirateplot(formula = Matching_Discrepancy ~ BRDF ,
            data = df,
@@ -278,8 +277,6 @@ pirateplot(formula = Rating ~ Ill_right + BRDF,
            point.col = "black",
            point.cex = .4) # Black points
 
-
-
 # ---- 3.3 consistency of reflectance estimation ----
 
 # Get consistency of reflectance estimation: 
@@ -294,9 +291,8 @@ agg_matching = aggregate(df_clean$Matching_Discrepancy,
 # normalize data, so it's between 0 and 1:
 #agg_matching$x = (agg_matching$x-min(agg_matching$x))/(max(agg_matching$x)-min(agg_matching$x))
 
-
 names(agg_matching) <- c("Ill_left", "Ill_right", "BRDF","SD")
-
+agg_matching
 # plot gloss consistency
 pirateplot(formula = SD ~ Ill_right + Ill_left + BRDF, 
            data = agg_matching, # put single participant df name here
@@ -308,6 +304,15 @@ pirateplot(formula = SD ~ Ill_right + Ill_left + BRDF,
            bar.b.o = .8, # Turn on bar border
            bar.b.col = "black") # Turn on bar border)
 
+pirateplot(formula = SD ~ Ill_right + Ill_left, 
+           data = agg_matching, # put single participant df name here
+           xlab = "BRDF",
+           ylab = "Rating",
+           theme = 2,  # Start with theme 2
+           pal = c("blue", "green", "yellow"),
+           bar.f.o = .2, # Turn on bars
+           bar.b.o = .8, # Turn on bar border
+           bar.b.col = "black") # Turn on bar border)
 
 # ---- 4. statistical analyses ----
 # disable scientific notation
@@ -322,7 +327,6 @@ shapiro.test(subset(df_clean, BRDF == "Ward")$Rating)
 shapiro.test(subset(df_clean, BRDF == "Fresnel")$Rating)
 
 # none of them are, so use non-parametric tests now:
-
 
 # hypothesis 1: gloss perception is > in Fresnel than in Ward
 
@@ -345,3 +349,4 @@ agg_matching_2 = aggregate(df_clean$Matching_Discrepancy,
 wilcox.test(subset(agg_matching_2, Group.1 == "Ward")$x, # is > than...
             subset(agg_matching_2, Group.1 == "Fresnel")$x, 
             paired=T) 
+
